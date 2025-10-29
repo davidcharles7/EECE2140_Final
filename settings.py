@@ -6,6 +6,10 @@ WIDTH = 1200
 HEIGHT = 540
 FPS = 60 
 
+#States
+RUNNING = True
+PAUSED = False
+
 
 #Colors
 BLACK = (0,0,0)
