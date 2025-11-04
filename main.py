@@ -28,6 +28,7 @@ class Game:
     # sprite and background images
     def load_data(self):
         #insert sprites here
+        self.and2_img = pg.image.load(path.join(img_folder, "AND2.png")).convert_alpha()
         print("Sprites loaded")
 
     def new(self):
@@ -37,6 +38,7 @@ class Game:
 
         # allows game to access sprites libraries
         self.all_sprites = pg.sprite.Group()
+        self.gates = pg.sprite.Group()
         self.platforms = pg.sprite.Group()
 
         for plat in PLATFORM_LIST:
@@ -51,10 +53,9 @@ class Game:
         self.playing = True
         while self.playing:
             self.clock.tick(FPS)
-            # checkpos makes sure player stays inbounds
             #self.player.checkpos()
-            #self.events()
-            #self.update()
+            self.events()
+            self.update()
             #self.draw()
             # print(self.player.pos.x)
 
@@ -75,7 +76,6 @@ class Game:
     
     def update(self):
         self.all_sprites.update()
-        self.player.checkpos()
 
     def get_mouse_now(self):
         x,y = pg.mouse.get_pos()

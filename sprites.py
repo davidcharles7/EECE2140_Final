@@ -8,6 +8,41 @@ from random import randint
 
 vec = pg.math.Vector2
 
+class Gate(Sprite):
+    def __init__(self, game):
+        Sprite.__init__(self)
+        self.game = game
+        self.image = pg.transform.scale(game.AND2.img, (150,150))
+        self.rect = self.image.get_rect()
+        self.image.set_colorkey(BLACK)
+        self.rect.center = (WIDTH/2, HEIGHT/2)
+        self.pos = (1000, 1000)
+        self.vel = vec(randint(1,5),randint(1,5))
+        self.acc = vec(1,1)
+        self.cofric = 0.01
+    # ...
+    def checkpos(self):
+        if self.rect.x > WIDTH:
+            self.vel.x *= -1
+            # self.acc = self.vel * -self.cofric
+        if self.rect.x < 0:
+            self.vel.x *= -1
+            # self.acc = self.vel * -self.cofric
+        if self.rect.y < 0:
+            self.pos.y = 25
+            self.vel.y *= -1
+            # self.acc = self.vel * -self.cofric
+        if self.rect.y > HEIGHT:
+            self.vel.y *= -1
+            # self.acc = self.vel * -self.cofric
+    def update(self):
+        self.checkpos()
+        # self.pos.x += self.vel.x
+        # self.pos.y += self.vel.y
+        # self.pos += self.vel
+        self.rect.center = self.pos
+
+
 #Creates platform sprite
 class Platform(Sprite):
     def __init__(self, x, y, width, height, color, variant):
