@@ -2,8 +2,8 @@
 # Written by David Charles
 
 #Settings 
-WIDTH = 1200
-HEIGHT = 540
+WIDTH = 1540
+HEIGHT = 880
 FPS = 60 
 
 #States

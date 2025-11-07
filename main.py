@@ -29,6 +29,9 @@ class Game:
     def load_data(self):
         #insert sprites here
         self.and2_img = pg.image.load(path.join(img_folder, "AND2.png")).convert_alpha()
+        
+        #backgrounds & statics
+        self.background_main_img = pg.image.load(path.join(img_folder, "Background_main.png")).convert()
         print("Sprites loaded")
 
     def new(self):
@@ -49,6 +52,10 @@ class Game:
         #self.all_sprites.add(self)
         self.run()    
 
+    def draw(self):
+        self.screen.blit(self.background_main_img, (0,0))
+        pg.display.flip()
+
     def run(self):
         self.playing = True
         while self.playing:
@@ -56,7 +63,7 @@ class Game:
             #self.player.checkpos()
             self.events()
             self.update()
-            #self.draw()
+            self.draw()
             # print(self.player.pos.x)
 
     def draw_text(self, text, size, color, x, y):
