@@ -56,3 +56,81 @@ class Platform(Sprite):
         self.rect.x = x
         self.rect.y = y
         self.variant = variant
+
+
+class Draggable(Sprite):
+    def __init__(self, image: pg.Surface, pos=(0,0), scale: float = 1.25):
+
+        Sprite.__init__(self)
+        # store original image and compute scaled image
+        self._orig_image = image.copy()
+        try:
+            self._orig_image = self._orig_image.convert_alpha()
+        except Exception:
+            pass
+
+        # compute scaled size
+        w, h = self._orig_image.get_size()
+        sw = max(1, int(w * scale))
+        sh = max(1, int(h * scale))
+        try:
+            self.image = pg.transform.smoothscale(self._orig_image, (sw, sh))
+        except Exception:
+            # fallback to simple scale
+            self.image = pg.transform.scale(self._orig_image, (sw, sh))
+
+        # ensure transparency preserved
+        try:
+            self.image = self.image.convert_alpha()
+        except Exception:
+            pass
+
+        # create rect and selection state
+        self.rect = self.image.get_rect(topleft=pos)
+        # store scale and original size for later adjustments
+        self.scale = float(scale)
+        self.orig_size = (w, h)
+        self.selected = False
+        self._offset = (0, 0)
+
+    def set_scale(self, scale: float):
+        """Rescale the sprite image and update rect keeping topleft position."""
+        if scale <= 0:
+            return
+        self.scale = float(scale)
+        w, h = self.orig_size
+        sw = max(1, int(w * self.scale))
+        sh = max(1, int(h * self.scale))
+        try:
+            self.image = pg.transform.smoothscale(self._orig_image, (sw, sh))
+        except Exception:
+            self.image = pg.transform.scale(self._orig_image, (sw, sh))
+        try:
+            self.image = self.image.convert_alpha()
+        except Exception:
+            pass
+        # maintain current topleft
+        topleft = (self.rect.x, self.rect.y)
+        self.rect = self.image.get_rect(topleft=topleft)
+
+    def select(self, mouse_pos):
+        mx, my = mouse_pos
+        ox = mx - self.rect.x
+        oy = my - self.rect.y
+        self._offset = (ox, oy)
+        self.selected = True
+
+    def move(self, mouse_pos):
+        if not self.selected:
+            return
+        mx, my = mouse_pos
+        ox, oy = self._offset
+        self.rect.x = mx - ox
+        self.rect.y = my - oy
+
+    def deselect(self):
+        self.selected = False
+
+    def update(self):
+        # update can be used for animations later; currently nothing needed
+        pass

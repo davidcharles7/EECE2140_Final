@@ -21,4 +21,4 @@ GRAY = (60,60,60)
 
 
 #Platforms
-PLATFORM_LIST = [(0, HEIGHT - 80, WIDTH, 80 , BLACK, "normal")]
+PLATFORM_LIST = []
