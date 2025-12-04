@@ -124,6 +124,12 @@ class Draggable(Sprite):
         # whether this sprite is currently stored in the tray (i.e. at its default)
         # When the user moves a sprite away from its default, this will be set False.
         self.in_tray = True
+        
+        # Connection nodes: positions where wires can attach
+        # Format: {'input1': (x, y), 'input2': (x, y), 'output': (x, y), ...}
+        self.nodes = {}
+        # Node type: 'gate', 'input', 'output'
+        self.node_type = None
 
     def set_scale(self, scale: float):
         #Rescale the sprite image and update rect keeping topleft position.
@@ -237,6 +243,14 @@ class Draggable(Sprite):
             # Copy sprite_info if it exists
             if hasattr(self, 'sprite_info'):
                 new_sprite.sprite_info = self.sprite_info
+            # Copy truth_table if it exists
+            if hasattr(self, 'truth_table'):
+                new_sprite.truth_table = self.truth_table
+            # Copy node information
+            if hasattr(self, 'nodes'):
+                new_sprite.nodes = self.nodes.copy()
+            if hasattr(self, 'node_type'):
+                new_sprite.node_type = self.node_type
             return new_sprite
         except Exception:
             return None
@@ -249,6 +263,32 @@ class Draggable(Sprite):
                 self.snap_to_grid()
             except Exception:
                 pass
+    
+    def get_node_positions(self):
+        """Return absolute positions of all connection nodes."""
+        abs_nodes = {}
+        for node_name, (rel_x, rel_y) in self.nodes.items():
+            abs_x = self.rect.x + rel_x
+            abs_y = self.rect.y + rel_y
+            abs_nodes[node_name] = (abs_x, abs_y)
+        return abs_nodes
+    
+    def get_closest_node(self, pos, max_distance=15):
+        """Find the closest node to a given position within max_distance.
+        Returns (node_name, (x, y)) or (None, None) if no node is close enough.
+        """
+        abs_nodes = self.get_node_positions()
+        closest_node = None
+        closest_dist = max_distance
+        
+        px, py = pos
+        for node_name, (nx, ny) in abs_nodes.items():
+            dist = ((px - nx) ** 2 + (py - ny) ** 2) ** 0.5
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_node = (node_name, (nx, ny))
+        
+        return closest_node if closest_node else (None, None)
 
     # removed anchor helper; rect.topleft represents sprite position
 
@@ -266,3 +306,98 @@ class TraySprite(Sprite):
     
     def update(self):
         pass
+
+
+class Wire(Sprite):
+    """A wire sprite that connects two grid points with a grid-aligned line."""
+    def __init__(self, start_pos, end_pos=None, color=BLACK, width=3):
+        Sprite.__init__(self)
+        self.start_pos = start_pos  # (x, y) tuple
+        self.end_pos = end_pos if end_pos else start_pos  # (x, y) tuple
+        self.color = color
+        self.wire_width = width
+        self.is_preview = (end_pos is None)  # True while user is still dragging
+        
+        # Connection tracking: which sprites/nodes are connected at each end
+        self.start_connection = None  # (sprite, node_name) or None
+        self.end_connection = None    # (sprite, node_name) or None
+        
+        # Wire-to-wire connections: track if this wire intersects other wires
+        # Format: [(other_wire, intersection_point), ...]
+        self.wire_connections = []
+        
+        # Create a minimal rect for sprite system (will be updated when drawing)
+        self.rect = pg.Rect(start_pos[0], start_pos[1], 1, 1)
+        self.image = pg.Surface((1, 1), pg.SRCALPHA)
+        
+    def update_end(self, end_pos):
+        """Update the end position (used while dragging to preview)."""
+        self.end_pos = end_pos
+        
+    def finalize(self):
+        """Mark wire as finalized (no longer a preview)."""
+        self.is_preview = False
+        
+    def draw(self, surface):
+        """Draw the wire as a grid-aligned line (orthogonal segments)."""
+        if not self.start_pos or not self.end_pos:
+            return
+            
+        x1, y1 = self.start_pos
+        x2, y2 = self.end_pos
+        
+        # Draw wire as L-shaped path: horizontal then vertical
+        # First segment: horizontal from start to end_x
+        mid_point = (x2, y1)
+        pg.draw.line(surface, self.color, (x1, y1), mid_point, self.wire_width)
+        # Second segment: vertical from mid to end
+        pg.draw.line(surface, self.color, mid_point, (x2, y2), self.wire_width)
+        
+        # Draw small circles at connection points
+        pg.draw.circle(surface, self.color, (x1, y1), self.wire_width + 1)
+        pg.draw.circle(surface, self.color, (x2, y2), self.wire_width + 1)
+        
+        # Draw connection indicators (green circles when connected)
+        if self.start_connection:
+            pg.draw.circle(surface, GREEN, (x1, y1), self.wire_width + 3, 2)
+        if self.end_connection:
+            pg.draw.circle(surface, GREEN, (x2, y2), self.wire_width + 3, 2)
+        
+        # Draw wire-to-wire connection points (cyan circles)
+        for other_wire, intersection_point in self.wire_connections:
+            pg.draw.circle(surface, (0, 255, 255), intersection_point, self.wire_width + 2)
+            pg.draw.circle(surface, (0, 255, 255), intersection_point, self.wire_width, 0)  # Filled circle
+    
+    def update(self):
+        pass
+    
+    def get_intersection_point(self, other_wire):
+        """Check if this wire intersects with another wire and return the intersection point.
+        Returns (x, y) tuple if intersection exists within both wire paths, None otherwise.
+        """
+        try:
+            # Get the two segments for this wire
+            x1, y1 = self.start_pos
+            x2, y2 = self.end_pos
+            mid1 = (x2, y1)  # Horizontal then vertical
+            
+            # Get the two segments for the other wire
+            ox1, oy1 = other_wire.start_pos
+            ox2, oy2 = other_wire.end_pos
+            omid = (ox2, oy1)
+            
+            # Check horizontal segment of this wire vs vertical segment of other wire
+            # This wire horizontal: (x1, y1) to (x2, y1)
+            # Other wire vertical: (ox2, oy1) to (ox2, oy2)
+            if min(x1, x2) <= ox2 <= max(x1, x2) and min(oy1, oy2) <= y1 <= max(oy1, oy2):
+                return (ox2, y1)
+            
+            # Check vertical segment of this wire vs horizontal segment of other wire
+            # This wire vertical: (x2, y1) to (x2, y2)
+            # Other wire horizontal: (ox1, oy1) to (ox2, oy1)
+            if min(y1, y2) <= oy1 <= max(y1, y2) and min(ox1, ox2) <= x2 <= max(ox1, ox2):
+                return (x2, oy1)
+            
+            return None
+        except Exception:
+            return None

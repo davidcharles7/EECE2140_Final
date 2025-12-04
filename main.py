@@ -38,9 +38,15 @@ class Game:
         self.info_button_rect = pg.Rect(self.delete_button_rect.right -245, self.delete_button_rect.top, self.delete_button_rect.width, self.delete_button_rect.height)
         # undo button placed next to info button
         self.undo_button_rect = pg.Rect(self.info_button_rect.right - 245, self.info_button_rect.top, self.info_button_rect.width, self.info_button_rect.height)
+        # wire button placed in tray area (bottom left)
+        self.wire_button_rect = pg.Rect(800, 750, 115, 60)
         # info display state
         self.show_info = False
         self.info_sprite = None
+        # wire drawing mode
+        self.wire_mode = False
+        self.current_wire = None  # Wire being drawn
+        self.selected_wire = None  # Currently selected wire for deletion
         # will hold draggable sprites for the tray (created in load_data)
         self.tray_sprites = []
         # tray sprite background (created in load_data, added/removed from group on toggle)
@@ -61,6 +67,16 @@ class Game:
         self.xnor2_img = pg.image.load(path.join(img_folder, "XNOR2.png")).convert_alpha()
         self.not1_img = pg.image.load(path.join(img_folder, "NOT.png")).convert_alpha()
         self.buffer_img = pg.image.load(path.join(img_folder, "BUF.png")).convert_alpha()
+        
+        # Load truth table images
+        self.and_table_img = pg.image.load(path.join(img_folder, "AND_TABLE.png")).convert_alpha()
+        self.nand_table_img = pg.image.load(path.join(img_folder, "NAND_TABLE.png")).convert_alpha()
+        self.or_table_img = pg.image.load(path.join(img_folder, "OR_TABLE.png")).convert_alpha()
+        self.nor_table_img = pg.image.load(path.join(img_folder, "NOR_TABLE.png")).convert_alpha()
+        self.xor_table_img = pg.image.load(path.join(img_folder, "XOR_TABLE.png")).convert_alpha()
+        self.xnor_table_img = pg.image.load(path.join(img_folder, "XNOR_TABLE.png")).convert_alpha()
+        self.not_table_img = pg.image.load(path.join(img_folder, "NOT_TABLE.png")).convert_alpha()
+        self.buf_table_img = pg.image.load(path.join(img_folder, "BUF_TABLE.png")).convert_alpha()
         
         #backgrounds & statics
         self.background_main_img = pg.image.load(path.join(img_folder, "Background_main.png")).convert()
@@ -84,7 +100,7 @@ class Game:
             # positions inside the tray area (add more slots for letter sprites)
             tray_positions = [
                 (40, 630), (230, 630), (420, 630), (610, 630),
-                (40, 750), (230, 750), (420, 750), (610, 750),
+                (40, 750), (230, 750), (610, 750), (420, 750),
                 (800, 630), (920, 630), (1040, 630), (1160, 630)
             ]
 
@@ -129,6 +145,10 @@ class Game:
             # create Draggable instances for all images, but do NOT add to sprite groups yet
             self.tray_sprites = []
             sprite_names = ['AND Gate', 'NAND Gate', 'OR Gate', 'NOR Gate', 'XOR Gate', 'XNOR Gate', 'NOT Gate', 'Buffer', 'Input A', 'Input B', 'Input C', 'Output']
+            truth_tables = [self.and_table_img, self.nand_table_img, self.or_table_img, self.nor_table_img, 
+                          self.xor_table_img, self.xnor_table_img, self.not_table_img, self.buf_table_img,
+                          None, None, None, None]  # No truth tables for I/O blocks
+            
             for idx, (pos, img) in enumerate(zip(tray_positions, imgs)):
                 # Apply horizontal stretch and snap offset only to gates/buffer (indices 0-7)
                 is_gate = (idx < 8)
@@ -138,8 +158,43 @@ class Game:
                 # Mark whether this sprite should be cloned when dragged out
                 # Gates and buffer (indices 0-7) can be cloned; letter blocks (8-11) cannot
                 dr.is_cloneable = (idx < 8)
-                # Add info text placeholder
-                dr.sprite_info = f"{sprite_names[idx]}\n\n[Placeholder description for {sprite_names[idx]}]\n\nAdd detailed information here."
+                # Store truth table image instead of text description
+                dr.sprite_info = sprite_names[idx]
+                dr.truth_table = truth_tables[idx] if idx < len(truth_tables) else None
+                
+                # Define connection nodes based on sprite type
+                if idx < 6:  # Two-input gates (AND, NAND, OR, NOR, XOR, XNOR)
+                    dr.node_type = 'gate'
+                    dr.nodes = {
+                        'input1': (0, int(dr.image.get_height() * 0.35)),  # Top input
+                        'input2': (0, int(dr.image.get_height() * 0.65)),  # Bottom input
+                        'output': (dr.image.get_width(), int(dr.image.get_height() * 0.5))  # Right output
+                    }
+                elif idx < 8:  # Single-input gates (NOT, Buffer)
+                    dr.node_type = 'gate'
+                    dr.nodes = {
+                        'input1': (0, int(dr.image.get_height() * 0.5)),  # Left input
+                        'output': (dr.image.get_width(), int(dr.image.get_height() * 0.5))  # Right output
+                    }
+                elif idx < 11:  # Input blocks (A, B, C)
+                    dr.node_type = 'input'
+                    dr.nodes = {
+                        'output_center': (int(dr.image.get_width() * 0.5), int(dr.image.get_height() * 0.5)),  # Center
+                        'output_top': (int(dr.image.get_width() * 0.5), 0),  # Top edge
+                        'output_bottom': (int(dr.image.get_width() * 0.5), dr.image.get_height()),  # Bottom edge
+                        'output_left': (0, int(dr.image.get_height() * 0.5)),  # Left edge
+                        'output_right': (dr.image.get_width(), int(dr.image.get_height() * 0.5))  # Right edge
+                    }
+                else:  # Output block
+                    dr.node_type = 'output'
+                    dr.nodes = {
+                        'input_center': (int(dr.image.get_width() * 0.5), int(dr.image.get_height() * 0.5)),  # Center
+                        'input_top': (int(dr.image.get_width() * 0.5), 0),  # Top edge
+                        'input_bottom': (int(dr.image.get_width() * 0.5), dr.image.get_height()),  # Bottom edge
+                        'input_left': (0, int(dr.image.get_height() * 0.5)),  # Left edge
+                        'input_right': (dr.image.get_width(), int(dr.image.get_height() * 0.5))  # Right edge
+                    }
+                
                 self.tray_sprites.append(dr)
         except Exception:
             # if anything goes wrong creating tray sprites, ensure list exists but empty
@@ -156,6 +211,8 @@ class Game:
         self.platforms = pg.sprite.Group()
         # separate group for the tray background sprite
         self.tray_ui = pg.sprite.Group()
+        # separate group for wires
+        self.wires = pg.sprite.Group()
 
         for plat in PLATFORM_LIST:
             p = Platform(*plat)
@@ -288,6 +345,34 @@ class Game:
         except Exception:
             pass
         
+        # Draw wire button only when tray is open
+        if self.tray_open:
+            try:
+                wire_color = (0, 200, 200) if self.wire_mode else (100, 180, 180)
+                pg.draw.rect(self.screen, wire_color, self.wire_button_rect)
+                self.draw_text("Wire", 28, WHITE, self.wire_button_rect.centerx, self.wire_button_rect.centery - 18)
+            except Exception:
+                pass
+        
+        # Draw wires
+        try:
+            for wire in self.wires:
+                wire.draw(self.screen)
+                # Draw selection outline if wire is selected
+                if wire == self.selected_wire:
+                    # Draw a highlight around the wire path
+                    x1, y1 = wire.start_pos
+                    x2, y2 = wire.end_pos
+                    mid_point = (x2, y1)
+                    # Draw thicker lines in red for selection
+                    pg.draw.line(self.screen, RED, (x1, y1), mid_point, wire.wire_width + 4)
+                    pg.draw.line(self.screen, RED, mid_point, (x2, y2), wire.wire_width + 4)
+            # Draw current wire preview if in wire mode
+            if self.current_wire:
+                self.current_wire.draw(self.screen)
+        except Exception:
+            pass
+        
         # Draw info box if info is being shown
         if self.show_info and self.info_sprite:
             self.draw_info_box()
@@ -320,31 +405,70 @@ class Game:
             pad = int(GRID_BORDER_PADDING)
             inset = border + pad
             
-            # Info box dimensions and position (top-right corner of grid)
-            box_width = 300
-            box_height = 200
-            box_x = tx + tw - inset - box_width - 20
-            box_y = ty + inset + 20
+            # Check if sprite has a truth table image
+            truth_table = getattr(self.info_sprite, 'truth_table', None)
             
-            # Draw white background with blue outline
-            info_rect = pg.Rect(box_x, box_y, box_width, box_height)
-            pg.draw.rect(self.screen, WHITE, info_rect)
-            pg.draw.rect(self.screen, BLUE, info_rect, 3)
-            
-            # Get info text from sprite
-            info_text = getattr(self.info_sprite, 'sprite_info', 'No information available.')
-            
-            # Draw text (split by newlines for multi-line display)
-            font = pg.font.Font(None, 24)
-            y_offset = box_y + 15
-            line_height = 25
-            
-            for line in info_text.split('\n'):
-                if y_offset + line_height > box_y + box_height - 10:
-                    break  # Don't draw beyond box bounds
-                text_surface = font.render(line, True, BLACK)
+            if truth_table:
+                # Display truth table image
+                # Scale image to fit in info box if needed
+                table_width = truth_table.get_width()
+                table_height = truth_table.get_height()
+                
+                # Info box sized to fit the table with some padding
+                box_width = min(table_width + 20, 400)
+                box_height = min(table_height + 60, 300)
+                
+                # Scale table if needed
+                if table_width > box_width - 20 or table_height > box_height - 60:
+                    scale_factor = min((box_width - 20) / table_width, (box_height - 60) / table_height)
+                    scaled_width = int(table_width * scale_factor)
+                    scaled_height = int(table_height * scale_factor)
+                    scaled_table = pg.transform.smoothscale(truth_table, (scaled_width, scaled_height))
+                else:
+                    scaled_table = truth_table
+                    scaled_width = table_width
+                    scaled_height = table_height
+                
+                box_x = tx + tw - inset - box_width - 20
+                box_y = ty + inset + 20
+                
+                # Draw white background with blue outline
+                info_rect = pg.Rect(box_x, box_y, box_width, box_height)
+                pg.draw.rect(self.screen, WHITE, info_rect)
+                pg.draw.rect(self.screen, BLUE, info_rect, 3)
+                
+                # Draw title
+                sprite_name = getattr(self.info_sprite, 'sprite_info', 'Gate')
+                font = pg.font.Font(None, 28)
+                title_surface = font.render(sprite_name, True, BLACK)
+                self.screen.blit(title_surface, (box_x + 10, box_y + 10))
+                
+                # Draw truth table image
+                img_x = box_x + (box_width - scaled_width) // 2
+                img_y = box_y + 45
+                self.screen.blit(scaled_table, (img_x, img_y))
+            else:
+                # No truth table, show text info (for I/O blocks)
+                box_width = 300
+                box_height = 200
+                box_x = tx + tw - inset - box_width - 20
+                box_y = ty + inset + 20
+                
+                # Draw white background with blue outline
+                info_rect = pg.Rect(box_x, box_y, box_width, box_height)
+                pg.draw.rect(self.screen, WHITE, info_rect)
+                pg.draw.rect(self.screen, BLUE, info_rect, 3)
+                
+                # Get info text from sprite
+                info_text = getattr(self.info_sprite, 'sprite_info', 'No information available.')
+                
+                # Draw text
+                font = pg.font.Font(None, 24)
+                y_offset = box_y + 15
+                line_height = 25
+                
+                text_surface = font.render(info_text, True, BLACK)
                 self.screen.blit(text_surface, (box_x + 10, y_offset))
-                y_offset += line_height
                 
         except Exception:
             pass
@@ -429,6 +553,27 @@ class Game:
 
                 # check if delete button was clicked
                 if self.delete_button_rect.collidepoint(mouse_pos):
+                    # Delete the selected wire if one is selected
+                    if self.selected_wire:
+                        try:
+                            # Remove this wire's connections from other wires
+                            for other_wire, intersection in self.selected_wire.wire_connections:
+                                # Remove the reverse connection
+                                other_wire.wire_connections = [(w, pt) for w, pt in other_wire.wire_connections if w != self.selected_wire]
+                            
+                            # Save delete action to undo stack
+                            self.undo_stack.append({
+                                'type': 'wire_delete',
+                                'wire': self.selected_wire,
+                                'wire_connections': self.selected_wire.wire_connections.copy()  # Save for undo
+                            })
+                            # Remove from wires group
+                            self.wires.remove(self.selected_wire)
+                            self.selected_wire = None
+                        except Exception:
+                            pass
+                        continue
+                    
                     # Delete the selected sprite if it's cloneable (not A,B,C,OUT)
                     if self.selected_sprite and getattr(self.selected_sprite, 'is_cloneable', True):
                         try:
@@ -481,6 +626,41 @@ class Game:
                     self.undo_last_action()
                     continue
 
+                # check if wire button was clicked (only when tray is open)
+                if self.tray_open and self.wire_button_rect.collidepoint(mouse_pos):
+                    self.wire_mode = not self.wire_mode
+                    # Exit wire mode if we were drawing
+                    if not self.wire_mode and self.current_wire:
+                        self.current_wire = None
+                    continue
+
+                # Handle wire drawing
+                if self.wire_mode:
+                    # Snap mouse position to grid
+                    snapped_pos = self.snap_position_to_grid(mouse_pos)
+                    # Start a new wire
+                    self.current_wire = Wire(snapped_pos, snapped_pos)
+                    continue
+
+                # Check if click is on a wire (when not in wire mode)
+                if not self.wire_mode:
+                    clicked_wire = None
+                    for wire in self.wires:
+                        if self.is_point_near_wire(mouse_pos, wire):
+                            clicked_wire = wire
+                            break
+                    
+                    if clicked_wire:
+                        # Select the wire and deselect any selected sprite
+                        self.selected_wire = clicked_wire
+                        if self.selected_sprite:
+                            self.selected_sprite.deselect()
+                            self.selected_sprite = None
+                        continue
+                    else:
+                        # Clicked empty space, deselect wire
+                        self.selected_wire = None
+
                 # Check if click is on any tray sprite (topmost first)
                 clicked_sprite = None
                 for sprite in reversed(self.tray_sprites):
@@ -493,6 +673,8 @@ class Game:
                     if self.selected_sprite and self.selected_sprite != clicked_sprite:
                         self.selected_sprite.deselect()
                     self.selected_sprite = clicked_sprite
+                    # Deselect any selected wire
+                    self.selected_wire = None
                     # Store starting position BEFORE selecting (before any potential snap)
                     try:
                         self.selected_sprite._drag_start_pos = self.selected_sprite.rect.topleft
@@ -506,6 +688,24 @@ class Game:
                         self.selected_sprite = None
 
             elif event.type == pg.MOUSEBUTTONUP and event.button == 1:
+                # Handle wire completion
+                if self.wire_mode and self.current_wire:
+                    # Finalize the wire and add to wires group
+                    self.current_wire.finalize()
+                    # Detect connections at both ends
+                    self.detect_wire_connections(self.current_wire)
+                    self.wires.add(self.current_wire)
+                    # Add to undo stack
+                    try:
+                        self.undo_stack.append({
+                            'type': 'wire',
+                            'wire': self.current_wire
+                        })
+                    except Exception:
+                        pass
+                    self.current_wire = None
+                    continue
+                
                 if self.selected_sprite:
                     # Save move action to undo stack if sprite moved
                     try:
@@ -531,6 +731,12 @@ class Game:
                         pass
 
             elif event.type == pg.MOUSEMOTION:
+                # Update wire preview while dragging
+                if self.wire_mode and self.current_wire:
+                    snapped_pos = self.snap_position_to_grid(event.pos)
+                    self.current_wire.update_end(snapped_pos)
+                    continue
+                
                 # Apply a small drag threshold so clicks don't move sprites
                 if self.selected_sprite and getattr(self.selected_sprite, 'selected', False):
                     # determine if left button is down
@@ -650,10 +856,179 @@ class Game:
                         sprite.moved_from_default = sprite_state['moved_from_default']
                     if hasattr(sprite, 'snap_enabled'):
                         sprite.snap_enabled = sprite_state['snap_enabled']
+            
+            elif action['type'] == 'wire':
+                # Remove the wire that was created
+                wire = action['wire']
+                if wire in self.wires:
+                    self.wires.remove(wire)
+            
+            elif action['type'] == 'wire_delete':
+                # Restore the deleted wire
+                wire = action['wire']
+                if wire not in self.wires:
+                    self.wires.add(wire)
+                    # Restore wire-to-wire connections
+                    try:
+                        saved_connections = action.get('wire_connections', [])
+                        for other_wire, intersection in saved_connections:
+                            if other_wire in self.wires:
+                                # Re-add bidirectional connection
+                                if (wire, intersection) not in other_wire.wire_connections:
+                                    other_wire.wire_connections.append((wire, intersection))
+                    except Exception:
+                        pass
         
         except Exception as e:
             # If undo fails, skip silently
             pass
+
+    def detect_wire_connections(self, wire):
+        """Detect and store connections between a wire and sprite nodes, and other wires."""
+        try:
+            # Check start position for sprite connections
+            for sprite in self.tray_sprites:
+                if sprite in self.all_sprites:  # Only check visible sprites
+                    node_name, node_pos = sprite.get_closest_node(wire.start_pos)
+                    if node_name:
+                        wire.start_connection = (sprite, node_name)
+                        break
+            
+            # Check end position for sprite connections
+            for sprite in self.tray_sprites:
+                if sprite in self.all_sprites:  # Only check visible sprites
+                    node_name, node_pos = sprite.get_closest_node(wire.end_pos)
+                    if node_name:
+                        wire.end_connection = (sprite, node_name)
+                        break
+            
+            # Check for wire-to-wire intersections
+            for other_wire in self.wires:
+                if other_wire != wire and not other_wire.is_preview:
+                    intersection = wire.get_intersection_point(other_wire)
+                    if intersection:
+                        # Add bidirectional connection
+                        wire.wire_connections.append((other_wire, intersection))
+                        other_wire.wire_connections.append((wire, intersection))
+        except Exception:
+            pass
+    
+    def get_connections(self, sprite, node_name=None):
+        """Get all wires connected to a sprite's node(s).
+        If node_name is None, returns all connections to any node.
+        Returns list of (wire, node_name) tuples.
+        """
+        connections = []
+        try:
+            for wire in self.wires:
+                # Check start connection
+                if wire.start_connection and wire.start_connection[0] == sprite:
+                    conn_node = wire.start_connection[1]
+                    if node_name is None or conn_node == node_name:
+                        connections.append((wire, conn_node, 'start'))
+                
+                # Check end connection
+                if wire.end_connection and wire.end_connection[0] == sprite:
+                    conn_node = wire.end_connection[1]
+                    if node_name is None or conn_node == node_name:
+                        connections.append((wire, conn_node, 'end'))
+        except Exception:
+            pass
+        
+        return connections
+    
+    def get_connected_sprites(self, sprite, node_name):
+        """Get all sprites connected to a specific node via wires.
+        Returns list of (connected_sprite, connected_node_name) tuples.
+        """
+        connected = []
+        try:
+            connections = self.get_connections(sprite, node_name)
+            for wire, conn_node, wire_end in connections:
+                # Find the other end of the wire
+                if wire_end == 'start' and wire.end_connection:
+                    other_sprite, other_node = wire.end_connection
+                    connected.append((other_sprite, other_node))
+                elif wire_end == 'end' and wire.start_connection:
+                    other_sprite, other_node = wire.start_connection
+                    connected.append((other_sprite, other_node))
+        except Exception:
+            pass
+        
+        return connected
+    
+    def get_connected_wires(self, wire, visited=None):
+        """Get all wires connected to this wire (directly or through other wires).
+        Returns set of Wire objects that form a connected network.
+        """
+        if visited is None:
+            visited = set()
+        
+        if wire in visited:
+            return visited
+        
+        visited.add(wire)
+        
+        try:
+            # Check wire-to-wire connections
+            for other_wire, intersection in wire.wire_connections:
+                if other_wire not in visited:
+                    self.get_connected_wires(other_wire, visited)
+        except Exception:
+            pass
+        
+        return visited
+
+    def is_point_near_wire(self, point, wire, threshold=10):
+        """Check if a point is near a wire's path (within threshold pixels)."""
+        try:
+            px, py = point
+            x1, y1 = wire.start_pos
+            x2, y2 = wire.end_pos
+            mid_x, mid_y = x2, y1
+            
+            # Check horizontal segment (x1, y1) to (mid_x, mid_y)
+            min_x, max_x = min(x1, mid_x), max(x1, mid_x)
+            if min_x - threshold <= px <= max_x + threshold:
+                if abs(py - y1) <= threshold:
+                    return True
+            
+            # Check vertical segment (mid_x, mid_y) to (x2, y2)
+            min_y, max_y = min(mid_y, y2), max(mid_y, y2)
+            if min_y - threshold <= py <= max_y + threshold:
+                if abs(px - x2) <= threshold:
+                    return True
+            
+            return False
+        except Exception:
+            return False
+
+    def snap_position_to_grid(self, pos):
+        """Snap a screen position to the nearest grid intersection."""
+        try:
+            gx, gy = GRID_ORIGIN
+            # apply global grid offset
+            try:
+                gx = int(gx) + int(GRID_OFFSET_X)
+            except Exception:
+                gx = int(gx)
+            try:
+                gy = int(gy) + int(GRID_OFFSET_Y)
+            except Exception:
+                gy = int(gy)
+            try:
+                gs = int(GRID_SIZE)
+                if gs <= 0:
+                    gs = 40
+            except Exception:
+                gs = 40
+            
+            x, y = pos
+            snapped_x = gx + round((x - gx) / gs) * gs
+            snapped_y = gy + round((y - gy) / gs) * gs
+            return (int(snapped_x), int(snapped_y))
+        except Exception:
+            return pos
 
     def reset_tray_positions(self):
         """Reset all tray palette sprites to their original default positions.
