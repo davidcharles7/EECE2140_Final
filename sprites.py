@@ -251,6 +251,15 @@ class Draggable(Sprite):
                 new_sprite.nodes = self.nodes.copy()
             if hasattr(self, 'node_type'):
                 new_sprite.node_type = self.node_type
+            # Copy gate_type for logic gates
+            if hasattr(self, 'gate_type'):
+                new_sprite.gate_type = self.gate_type
+            # Copy label for input blocks
+            if hasattr(self, 'label'):
+                new_sprite.label = self.label
+            # Copy bit_value for input blocks
+            if hasattr(self, 'bit_value'):
+                new_sprite.bit_value = self.bit_value
             return new_sprite
         except Exception:
             return None
@@ -363,10 +372,10 @@ class Wire(Sprite):
         if self.end_connection:
             pg.draw.circle(surface, GREEN, (x2, y2), self.wire_width + 3, 2)
         
-        # Draw wire-to-wire connection points (cyan circles)
+        # Draw wire-to-wire connection points (green circles)
         for other_wire, intersection_point in self.wire_connections:
-            pg.draw.circle(surface, (0, 255, 255), intersection_point, self.wire_width + 2)
-            pg.draw.circle(surface, (0, 255, 255), intersection_point, self.wire_width, 0)  # Filled circle
+            pg.draw.circle(surface, GREEN, intersection_point, self.wire_width + 2)
+            pg.draw.circle(surface, GREEN, intersection_point, self.wire_width, 0)  # Filled circle
     
     def update(self):
         pass

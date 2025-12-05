@@ -41,7 +41,8 @@ class ORGate:
         self.b = int(b)
 
     def output(self):
-        return int(self.a or self.b)
+        # SWAPPED: OR image shows NOR gate, so compute NOR logic
+        return int(not (self.a or self.b))
 
 
 class NOTGate:
@@ -67,7 +68,8 @@ class NORGate:
         self.b = int(b)
 
     def output(self):
-        return int(not (self.a or self.b))
+        # SWAPPED: NOR image shows OR gate, so compute OR logic
+        return int(self.a or self.b)
 
 
 class XORGate:

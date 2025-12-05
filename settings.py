@@ -3,7 +3,7 @@
 
 # screen settings 
 WIDTH = 1540
-HEIGHT = 880
+HEIGHT = 890
 FPS = 60 
 
 # game states
@@ -36,7 +36,7 @@ GRID_OFFSET_Y = 0
 # block tray settings
 TRAY_BOX = (7, 105, 1525, 763, 3)  # (x, y, width, height, border_width)
 GRID_TRAY_SHRINK = 400
-GRID_TRAY_EXTENSION = 120
+GRID_TRAY_EXTENSION = 130
 
 # made a stretch factor for gates b/c pngs I used were slightly too small
 GATE_STRETCH_PX = 8
