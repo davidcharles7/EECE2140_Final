@@ -1556,7 +1556,7 @@ class Game:
         return (x,y)
 
     # logic eval
-
+    
     def evaluate_circuit_old(self):
         """Compute logic values on all nets and update output block(s). [DEPRECATED - old method]"""
         wire_to_net = {}
