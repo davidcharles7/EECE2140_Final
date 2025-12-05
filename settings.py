@@ -21,9 +21,6 @@ GRAY = (60,60,60)
 LIGHT_GRAY = (200,200,200)
 
 
-# platforms (leftover from game engine)
-PLATFORM_LIST = []
-
 # grid settings
 GRID_ORIGIN = (12, 110)
 GRID_SIZE = 19

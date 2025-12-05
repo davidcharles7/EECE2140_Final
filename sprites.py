@@ -21,25 +21,7 @@ class Gate(Sprite):
         self.acc = vec(1,1)
         self.cofric = 0.01
     # ...
-    def checkpos(self):
-        if self.rect.x > WIDTH:
-            self.vel.x *= -1
-            # self.acc = self.vel * -self.cofric
-        if self.rect.x < 0:
-            self.vel.x *= -1
-            # self.acc = self.vel * -self.cofric
-        if self.rect.y < 0:
-            self.pos.y = 25
-            self.vel.y *= -1
-            # self.acc = self.vel * -self.cofric
-        if self.rect.y > HEIGHT:
-            self.vel.y *= -1
-            # self.acc = self.vel * -self.cofric
     def update(self):
-        self.checkpos()
-        # self.pos.x += self.vel.x
-        # self.pos.y += self.vel.y
-        # self.pos += self.vel
         self.rect.center = self.pos
 
 

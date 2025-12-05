@@ -152,7 +152,7 @@ class Game:
                 snap_off = (GATE_SNAP_OFFSET_X, GATE_SNAP_OFFSET_Y) if is_gate else (0, 0)
                 dr = Draggable(img, pos=pos, scale=0.8, stretch_px=stretch, snap_offset=snap_off)
 
-                # Cloning disabled - each gate can only be used once
+                # leftover code from cloning function
                 dr.is_cloneable = False
                 dr.sprite_info = sprite_names[idx]
                 dr.truth_table = truth_tables[idx] if idx < len(truth_tables) else None
@@ -203,8 +203,7 @@ class Game:
         except Exception:
             self.tray_sprites = []
         
-        # Safety check: ensure all tray sprites have correct gate_type
-        # This fixes any clones that were created before the clone() method was fixed
+        # more old cloning leftovers
         gate_types = ['AND', 'NAND', 'OR', 'NOR', 'XOR', 'XNOR', 'NOT', 'BUF']
         for sprite in self.tray_sprites:
             if hasattr(sprite, 'node_type') and sprite.node_type == 'gate':
@@ -226,11 +225,6 @@ class Game:
         self.platforms = pg.sprite.Group()
         self.tray_ui = pg.sprite.Group()
         self.wires = pg.sprite.Group()
-
-        for plat in PLATFORM_LIST:
-            p = Platform(*plat)
-            self.all_sprites.add(p)
-            self.platforms.add(p)
         
         if self.tray_open:
             self.tray_ui.add(self.tray_sprite)
@@ -1238,7 +1232,7 @@ class Game:
     def update(self):
         self.all_sprites.update()
 
-        # handle cloning
+        # cloning - no longer needed
         if self.tray_open:
             try:
                 for sprite in list(self.tray_sprites):
@@ -1251,7 +1245,6 @@ class Game:
                     except Exception:
                         default_y = sprite.rect.y
                     moved_up_enough = sprite.rect.y < (default_y - 40)
-                    # Cloning disabled - each sprite is unique and can only be used once
                     # if moved_up_enough and sprite not in self.pending_clones:
                     #     self.pending_clones.append(sprite)
                     #     clone = sprite.clone()
@@ -1267,7 +1260,7 @@ class Game:
         # evaluate logic network every frame
         self.evaluate_circuit_old()
 
-    # --------- UNDO / RESET / GRID HELPERS (unchanged logic, plus wire cases) ---------
+    # undo/reset function memory
 
     def undo_last_action(self):
         if not self.undo_stack:
@@ -1300,6 +1293,7 @@ class Game:
                 if hasattr(sprite, 'dragging'):
                     sprite.dragging = False
             
+            #old code from delete function
             elif action['type'] == 'delete':
                 sprite = action['sprite']
                 if action['was_in_all'] and sprite not in self.all_sprites:
@@ -1561,11 +1555,10 @@ class Game:
         x,y = pg.mouse.get_pos()
         return (x,y)
 
-    # --------- LOGIC EVALUATION ---------
+    # logic eval
 
     def evaluate_circuit_old(self):
         """Compute logic values on all nets and update output block(s). [DEPRECATED - old method]"""
-        # 1) Build nets (clusters of wires connected together)
         wire_to_net = {}
         nets = []  # each is dict: {'wires': set, 'drivers': [], 'sinks': []}
         node_to_net = {}
@@ -1599,10 +1592,8 @@ class Game:
                         sinks.append((sprite, node_name))
             nets.append({'wires': cluster, 'drivers': drivers, 'sinks': sinks})
 
-        # 2) Initialize net values
         net_values = {i: None for i in range(len(nets))}
 
-        # 3) Iteratively propagate logic (simple fixed point)
         MAX_ITERS = 10
         for _ in range(MAX_ITERS):
             changed = False
@@ -1683,7 +1674,6 @@ class Game:
             if not changed:
                 break
 
-        # 4) Update output block(s)
         for sprite in self.tray_sprites:
             if getattr(sprite, 'node_type', None) != 'output':
                 continue
